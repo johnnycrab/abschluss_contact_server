@@ -2,6 +2,8 @@
 /// <reference path="./ts-definitions/node_redis/node_redis.d.ts" />
 
 import events = require('events');
+import sys = require('util');
+import cp = require('child_process');
 import redis = require('redis');
 
 /**
@@ -25,31 +27,32 @@ class NodeStorage extends events.EventEmitter {
 
 	private _redisClient:redis.RedisClient = null;
 	private _keyExpiryInSeconds:number = 3600 * 1000;
-	private _isReadWritable:boolean = false;
 
 	private _idListKey:string = 'idlist';
 	private _idListLength:number = null;
 
+	private _redisRunning:boolean = false;
 
 	constructor (keyExpiryInSeconds:number) {
 
 		super();
 
 		this._keyExpiryInSeconds = keyExpiryInSeconds;
+
 		this._redisClient = redis.createClient();
 
-		this._redisClient.on('error', function (err) {
+		this._redisClient.on('error', (err) => {
 			console.log('Redis error: ' + err);
+			if (!this._redisRunning && err.message.indexOf('ECONNREFUSED') > -1) {
+				this._startRedisServer();
+			}
 		});
 
 		this._redisClient.on('ready', () => {
-			this._isReadWritable = true;
+			this._redisRunning = true;
 			this.emit('ready');
 		});
 
-		this._redisClient.on('end', () => {
-			this._isReadWritable = false;
-		});
 	}
 
 	public getIdListLength ():number {
@@ -57,31 +60,29 @@ class NodeStorage extends events.EventEmitter {
 	}
 
 	public setNodeInformation (jsonObject):void {
-		if (this._isReadWritable) {
-			var id = jsonObject.id;
-			var addresses = jsonObject.addresses;
+		var id = jsonObject.id;
+		var addresses = jsonObject.addresses;
 
-			if (id.length === 40 && (addresses instanceof Array === true) && addresses.length) {
-				var stringToWrite = JSON.stringify(jsonObject);
+		if (id.length === 40 && (addresses instanceof Array === true) && addresses.length) {
+			var stringToWrite = JSON.stringify(jsonObject);
 
-				// check if an entry with the id already exists
-				this._redisClient.get(id, (err, res) => {
-					if (!err) {
+			// check if an entry with the id already exists
+			this._redisClient.get(id, (err, res) => {
+				if (!err) {
 
-						// does not exist. add it to the list
-						if (!res) {
-							this._redisClient.lpush(this._idListKey, id, (err, res) => {
-								if (!err) {
-									this._idListLength = res;
-								}
-							});
-						}
-
-						this._redisClient.set(id, stringToWrite, redis.print);
-						this._redisClient.expire(id, this._keyExpiryInSeconds, redis.print);
+					// does not exist. add it to the list
+					if (!res) {
+						this._redisClient.lpush(this._idListKey, id, (err, res) => {
+							if (!err) {
+								this._idListLength = res;
+							}
+						});
 					}
-				});
-			}
+
+					this._redisClient.set(id, stringToWrite, redis.print);
+					this._redisClient.expire(id, this._keyExpiryInSeconds, redis.print);
+				}
+			});
 		}
 
 	}
@@ -120,6 +121,17 @@ class NodeStorage extends events.EventEmitter {
 				}
 			});
 		});
+	}
+
+	private _startRedisServer ():void {
+		console.log('Starting Redis server...');
+
+		var exec = cp.exec;
+		var puts = function (error, stdout, stderr) {
+			sys.puts(stdout);
+		};
+
+		exec('redis-server', puts);
 	}
 
 }

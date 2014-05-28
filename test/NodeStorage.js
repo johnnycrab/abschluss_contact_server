@@ -4,7 +4,7 @@ require('should');
 var NodeStorage = require('../NodeStorage');
 var redis = require('redis');
 
-describe('TEST', function () {
+describe('Node Storage', function () {
     var redisClient = null;
     var nodeStorage = null;
 
@@ -75,4 +75,4 @@ describe('TEST', function () {
         }, 10);
     });
 });
-//# sourceMappingURL=main.js.map
+//# sourceMappingURL=NodeStorage.js.map

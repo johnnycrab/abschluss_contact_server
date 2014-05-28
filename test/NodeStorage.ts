@@ -6,7 +6,7 @@ import NodeStorage = require('../NodeStorage');
 import redis = require('redis');
 
 
-describe('TEST', function () {
+describe('Node Storage', function () {
 
 	var redisClient:redis.RedisClient = null;
 	var nodeStorage:NodeStorage = null;

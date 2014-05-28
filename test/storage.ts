@@ -8,6 +8,8 @@ import redis = require('redis');
 
 describe('Node Storage', function () {
 
+	this.timeout(0);
+
 	var redisClient:redis.RedisClient = null;
 	var nodeStorage:NodeStorage = null;
 
@@ -19,37 +21,48 @@ describe('Node Storage', function () {
 	};
 
 	before(function (done) {
-		redisClient = redis.createClient()
-		redisClient.on('ready', function () {
-			redisClient.flushall();
-			done();
+		nodeStorage = new NodeStorage(1);
+
+		nodeStorage.once('ready', function () {
+			redisClient = redis.createClient();
+			redisClient.on('error', function (err) {
+				console.log(err);
+			});
+
+			redisClient.once('ready', function () {
+				redisClient.flushall();
+				done();
+			});
 		});
 	});
 
 	after(function (done) {
 		if (redisClient) {
 			redisClient.quit();
-			redisClient.on('end', done);
+
+			redisClient.once('end', function () {
+				nodeStorage.killRedisServer();
+				done();
+			});
 		}
 	});
 
 	it('should successfully store a node', function (done) {
 
-		nodeStorage = new NodeStorage(1);
+		nodeStorage.setNodeInformation(dummyNode);
 
-		nodeStorage.on('ready', function () {
-			nodeStorage.setNodeInformation(dummyNode);
-
-			setTimeout(function () {
-				redisClient.llen('idlist', function (err, res) {
-					if (res === 1 && 1 === nodeStorage.getIdListLength()) {
-						redisClient.get(id, function (err, res) {
-							if (res === JSON.stringify(dummyNode)) done();
-						});
-					}
-				});
-			}, 10);
-		});
+		setTimeout(function () {
+			redisClient.llen('idlist', function (err, res) {
+				if (res === 1 && 1 === nodeStorage.getIdListLength()) {
+					redisClient.get(id, function (err, res) {
+						if (res === JSON.stringify(dummyNode)) {
+							console.log('done1');
+							done();
+						}
+					});
+				}
+			});
+		}, 10);
 	});
 
 	it('should expire the node id key', function (done) {
@@ -57,7 +70,7 @@ describe('Node Storage', function () {
 			redisClient.get(id, function (err, res) {
 				if (res === null) done();
 			})
-		}, 1000)
+		}, 1000);
 	});
 
 	it('should callback with null and the id list length should be zero', function (done) {

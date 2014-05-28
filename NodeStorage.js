@@ -37,6 +37,7 @@ var NodeStorage = (function (_super) {
         this._idListKey = 'idlist';
         this._idListLength = null;
         this._redisRunning = false;
+        this._redisServerProcess = null;
 
         this._keyExpiryInSeconds = keyExpiryInSeconds;
 
@@ -56,6 +57,14 @@ var NodeStorage = (function (_super) {
     }
     NodeStorage.prototype.getIdListLength = function () {
         return this._idListLength;
+    };
+
+    NodeStorage.prototype.killRedisServer = function () {
+        if (this._redisServerProcess) {
+            this._redisServerProcess.kill();
+            return true;
+        }
+        return false;
     };
 
     NodeStorage.prototype.setNodeInformation = function (jsonObject) {
@@ -129,7 +138,7 @@ var NodeStorage = (function (_super) {
             sys.puts(stdout);
         };
 
-        exec('redis-server', puts);
+        this._redisServerProcess = exec('redis-server', puts);
     };
     return NodeStorage;
 })(events.EventEmitter);

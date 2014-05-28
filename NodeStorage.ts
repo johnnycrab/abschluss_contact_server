@@ -32,6 +32,7 @@ class NodeStorage extends events.EventEmitter {
 	private _idListLength:number = null;
 
 	private _redisRunning:boolean = false;
+	private _redisServerProcess:cp.ChildProcess = null;
 
 	constructor (keyExpiryInSeconds:number) {
 
@@ -59,6 +60,14 @@ class NodeStorage extends events.EventEmitter {
 		return this._idListLength;
 	}
 
+	public killRedisServer ():boolean {
+		if (this._redisServerProcess) {
+			this._redisServerProcess.kill();
+			return true;
+		}
+		return false;
+	}
+
 	public setNodeInformation (jsonObject):void {
 		var id = jsonObject.id;
 		var addresses = jsonObject.addresses;
@@ -81,6 +90,7 @@ class NodeStorage extends events.EventEmitter {
 
 					this._redisClient.set(id, stringToWrite, redis.print);
 					this._redisClient.expire(id, this._keyExpiryInSeconds, redis.print);
+
 				}
 			});
 		}
@@ -96,6 +106,7 @@ class NodeStorage extends events.EventEmitter {
 		var randomIndex:number = Math.floor(Math.random() * this._idListLength);
 
 		this._redisClient.lindex(this._idListKey, randomIndex, (err, id) => {
+
 			if (err) {
 				callback(null);
 				return;
@@ -131,7 +142,7 @@ class NodeStorage extends events.EventEmitter {
 			sys.puts(stdout);
 		};
 
-		exec('redis-server', puts);
+		this._redisServerProcess = exec('redis-server', puts);
 	}
 
 }
